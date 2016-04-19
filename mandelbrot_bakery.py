@@ -8,6 +8,8 @@ import os
 import cv2 as cv
 from math import sqrt
 
+import time
+
 
 def mandelbrot_opencl(max_iter, height, width, boundries):
     assert (len(boundries) == 4)
@@ -46,7 +48,7 @@ def mandelbrot_opencl(max_iter, height, width, boundries):
             c.x = re0 + pos.x * (re1 - re0) / width;
             c.y = im0 + pos.y * (im1 - im0) / height;
 
-            double2 z = (0, 0);
+            double2 z = c;
             double temp = 0;
 
             for(uint iter = 0; iter < max_iter; iter++) {
@@ -93,8 +95,35 @@ def mandelbrot_opencl(max_iter, height, width, boundries):
     return result, img
 
 
-def mandelbrot_cpu():
-    pass
+def mandelbrot_cpu(max_iter, height, width, boundries):
+    assert (len(boundries) == 4)
+    re0, re1, im0, im1 = boundries
+
+    gradient = create_gradient(max_iter)
+    gradient = gradient.reshape((max_iter, 3))
+
+    img = np.zeros((height, width, 3), dtype=np.uint8)
+    result = np.empty(width*height, dtype=np.uint8)
+
+    for y in range(height):
+        print float(y)/height
+        for x in range(width):
+            c = (re0 + x*(re1 - re0) / width) + (im0 + y*(im1 - im0) / height)*1j
+            z = c
+
+            result[y*width+x] = 0;
+            img[y, x] = [0, 0, 0]
+
+            for i in range(max_iter):
+                z = z**2 +c
+
+                if abs(z)**2 > 4.:
+                    result[y*width+x] = i;
+                    img[y, x] = gradient[i]
+                    break
+
+    return result, img
+
 
 
 def save_img(img, show=True):
@@ -145,12 +174,12 @@ def create_gradient(count):
 
 
 mandelbrot = mandelbrot_opencl
-#mandelbrot = mandelbrot_cpu
+mandelbrot = mandelbrot_cpu
 
 max_iter = 4000
 
-width = 1920
-height = 1200
+width = 1920/10
+height = 1200/10
 
 re_center = -0.45
 im_center = 0.0
@@ -171,7 +200,6 @@ re_diameter = 0.0000036
 assert(type(re_center) == float and type(im_center) == float and type(re_diameter) == float)
 
 boundries = calc_boundries(re_center, im_center, re_diameter, float(width)/height)
-#boundries = (-2., 0.8, -1.2, 1.2)
 
 if __name__ == "__main__":
     result, img = mandelbrot(max_iter, height, width, boundries)
